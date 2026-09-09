@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Winston Tech POS</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="manifest" href="manifest.json">
+    <script>
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('./sw.js')
+          .then(() => console.log('Service Worker Registered'))
+          .catch((err) => console.log('SW Registration failed:', err));
+      }
+    </script>
+</head>
+<body>
+
+    <!-- TOP HEADER -->
+    <header class="app-header">
+        <div class="brand">
+            <h1>Winston Tech POS</h1>
+            <span class="subtext">Works with no signal</span>
+        </div>
+        <button id="auth-toggle-btn" type="button" class="btn btn-outline-light">Owner Login</button>
+    </header>
+
+    <!-- MAIN POS SCREEN -->
+    <main class="pos-container">
+        <!-- LEFT PANEL: INVENTORY SELECTION -->
+        <section class="inventory-section">
+            <div class="search-bar">
+                <input type="text" id="product-search" placeholder="Search inventory..." autocomplete="off">
+            </div>
+            <div id="product-grid" class="product-grid">
+                <!-- Dynamic product cards load here -->
+            </div>
+        </section>
+
+        <!-- RIGHT PANEL: CART & NUMPAD -->
+        <section class="checkout-section">
+            <div class="cart-box">
+                <div class="cart-header">
+                    <span>Receipt Cart</span>
+                    <span id="receipt-date">--:--</span>
+                </div>
+                <div id="cart-items" class="cart-items-list">
+                    <!-- Dynamic cart items -->
+                </div>
+                <div class="cart-total-row">
+                    <span>Total:</span>
+                    <strong id="cart-total">$0.00</strong>
+                </div>
+            </div>
+
+            <!-- PAYMENT & NUMPAD -->
+            <div class="controls-box">
+                <div class="numpad-display">
+                    <span>Quantity Entry:</span>
+                    <strong id="numpad-input">1</strong>
+                </div>
+
+                <div class="numpad-grid">
+                    <button type="button" class="num-btn" data-val="1">1</button>
+                    <button type="button" class="num-btn" data-val="2">2</button>
+                    <button type="button" class="num-btn" data-val="3">3</button>
+                    <button type="button" class="num-btn" data-val="4">4</button>
+                    <button type="button" class="num-btn" data-val="5">5</button>
+                    <button type="button" class="num-btn" data-val="6">6</button>
+                    <button type="button" class="num-btn" data-val="7">7</button>
+                    <button type="button" class="num-btn" data-val="8">8</button>
+                    <button type="button" class="num-btn" data-val="9">9</button>
+                    <button type="button" id="num-clear" class="num-btn action">C</button>
+                    <button type="button" class="num-btn" data-val="0">0</button>
+                    <button type="button" id="num-back" class="num-btn action">⌫</button>
+                </div>
+
+                <div class="payment-methods">
+                    <button type="button" class="btn-pay active" data-method="CASH">Cash</button>
+                    <button type="button" class="btn-pay" data-method="ECOCASH">EcoCash</button>
+                    <button type="button" class="btn-pay" data-method="CARD">Card</button>
+                </div>
+                <button type="button" id="btn-connect-printer" class="btn btn-outline-dark btn-full" style="margin-bottom: 8px;">
+                     Connect Bluetooth Printer
+                </button>
+
+                <button type="button" id="btn-complete-sale" class="btn btn-emerald btn-full">Complete Sale & Print</button>
+            </div>
+        </section>
+    </main>
+
+    <!-- PIN VERIFICATION POPUP -->
+    <div id="pin-modal" class="modal-overlay hidden">
+        <div class="pin-card">
+            <h3>Enter Owner PIN</h3>
+            <input type="password" id="owner-pin-input" maxlength="8" placeholder="****" autocomplete="off">
+            <div class="pin-actions">
+                <button type="button" id="btn-cancel-pin" class="btn btn-outline-dark">Cancel</button>
+                <button type="button" id="btn-submit-pin" class="btn btn-emerald">Unlock</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- OWNER DASHBOARD FULLSCREEN OVERLAY -->
+    <div id="owner-modal" class="owner-dashboard-container hidden">
+        <header class="dashboard-topbar">
+            <div class="topbar-brand">
+                <h2>Winston Tech</h2>
+                <span class="subtext">Works with no signal</span>
+            </div>
+            <button type="button" id="btn-lock-till" class="btn btn-outline-light">Lock and return to till</button>
+        </header>
+
+        <main class="dashboard-content">
+            <div class="dashboard-header-row">
+                <h1>Owner dashboard</h1>
+            </div>
+
+            <!-- Tabs -->
+            <nav class="dashboard-tabs">
+                <button type="button" id="tab-inventory" class="tab-btn active">Inventory</button>
+                <button type="button" id="tab-sales" class="tab-btn">Sales</button>
+                <button type="button" id="tab-settings" class="tab-btn">Settings</button>
+            </nav>
+
+            <!-- PANEL 1: INVENTORY -->
+            <div id="panel-inventory" class="tab-panel">
+                <div class="card metric-card">
+                    <h3>Master inventory</h3>
+                    <div class="metrics-grid">
+                        <div class="metric-item"><span class="metric-label">Products</span><span id="stat-products" class="metric-value">0</span></div>
+                        <div class="metric-item"><span class="metric-label">Total units</span><span id="stat-units" class="metric-value">0</span></div>
+                        <div class="metric-item"><span class="metric-label">Stock value (cost)</span><span id="stat-cost-val" class="metric-value">$0.00</span></div>
+                        <div class="metric-item"><span class="metric-label">Low / out of stock</span><span id="stat-low-stock" class="metric-value">0 / 0</span></div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h3>Add a product</h3>
+                    <form id="add-product-form" class="inline-form">
+                        <div class="form-group"><label>Name</label><input type="text" id="prod-name" required autocomplete="off"></div>
+                        <div class="form-group"><label>Cost</label><input type="number" id="prod-cost" step="0.01" required></div>
+                        <div class="form-group"><label>Price</label><input type="number" id="prod-price" step="0.01" required></div>
+                        <div class="form-group"><label>Stock</label><input type="number" id="prod-stock" required></div>
+                        <button type="submit" class="btn btn-emerald">Add</button>
+                    </form>
+                </div>
+
+                <div class="card">
+                    <h3>Products</h3>
+                    <div class="table-header-row">
+                        <span>Product</span><span>Cost</span><span>Price</span><span>Stock</span><span>Actions</span>
+                    </div>
+                    <div id="owner-inventory-list" class="table-body"></div>
+                </div>
+            </div>
+
+            <!-- PANEL 2: SALES REPORT -->
+            <div id="panel-sales" class="tab-panel hidden">
+                <div class="card">
+                    <h3 id="sales-summary-title">End-of-day summary</h3>
+                    <div class="sales-actions">
+                        <button type="button" id="btn-gen-report" class="btn btn-outline-dark">Generate today's report</button>
+                    </div>
+                    <div id="report-output-container" class="report-container hidden"></div>
+                </div>
+            </div>
+
+            <!-- PANEL 3: SETTINGS -->
+            <div id="panel-settings" class="tab-panel hidden">
+                <div class="grid-two-col">
+                    <div class="card">
+                        <h3>Shop settings</h3>
+                        <div class="form-group vertical">
+                            <label for="owner-phone">Owner WhatsApp number</label>
+                            <input type="text" id="owner-phone" placeholder="e.g. 2637xxxxxxx">
+                            <span class="help-text">Country code first, digits only — no spaces or +.</span>
+                        </div>
+                        <div class="form-group vertical">
+                            <label for="low-stock-input">Low stock threshold</label>
+                            <input type="number" id="low-stock-input" value="5">
+                        </div>
+                        <button type="button" id="btn-save-settings" class="btn btn-emerald btn-full">Save settings</button>
+                    </div>
+
+                    <div class="card">
+                        <h3>Change PIN</h3>
+                        <div class="form-group vertical"><label>Current PIN</label><input type="password" id="pin-current"></div>
+                        <div class="form-group vertical"><label>New PIN</label><input type="password" id="pin-new"></div>
+                        <div class="form-group vertical"><label>Confirm new PIN</label><input type="password" id="pin-confirm"></div>
+                        <button type="button" id="btn-update-pin" class="btn btn-emerald btn-full">Update PIN</button>
+                    </div>
+                </div>
+
+                <div class="card danger-card">
+                    <h3 class="text-danger">Danger zone</h3>
+                    <p class="help-text">Erases all local data. There is no undo.</p>
+                    <button type="button" id="btn-wipe-data" class="btn btn-danger-outline">Wipe all local data</button>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- SCRIPTS LOADED IN STRICT ORDER -->
+    <script src="js/db.js"></script>
+    <script src="js/pos.js"></script>
+    <script src="js/owner.js"></script>
+    
+    <script>
+        document.addEventListener("DOMContentLoaded", async () => {
+            try {
+                await initDB();
+                initPOS();
+                initOwner();
+            } catch (err) {
+                console.error("Boot failure:", err);
+            }
+        });
+    </script>
+</body>
+</html>
